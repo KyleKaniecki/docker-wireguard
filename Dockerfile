@@ -30,6 +30,8 @@ RUN \
 	openresolv \
 	perl \
 	pkg-config \
+	tcpdump \
+	dnsutils \
 	qrencode && \
  echo "**** install wireguard-tools ****" && \
  if [ -z ${WIREGUARD_RELEASE+x} ]; then \
@@ -61,5 +63,10 @@ RUN \
 # add local files
 COPY /root /
 
+RUN sed -i 's/\r$//g' /entrypoint
+RUN chmod +x /entrypoint
+
 # ports and volumes
 EXPOSE 51820/udp
+
+ENTRYPOINT ["/entrypoint"]

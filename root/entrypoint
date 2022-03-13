@@ -1,0 +1,62 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+search()
+{
+    name=$1
+    shift
+    havename=0
+    for w; do
+        if [ "$havename" = "1" ]; then
+            echo $w
+            break
+        fi
+        if [ "$w" = "$name" ]; then
+            havename=1
+        fi
+    done
+}
+
+first()
+{
+    echo $1
+}
+
+get_inet()
+{
+    ip address show dev $1 |
+    while read line; do
+        first_kw=$(first $line)
+        if [ "$first_kw" = "inet" ]; then
+            search inet $line
+            break
+        fi
+    done
+}
+
+DEFAULT_ROUTE=$(ip route | grep ^default | head -n 1)
+echo "Default route: $DEFAULT_ROUTE"
+
+DEFAULT_IFACE=$(search dev $DEFAULT_ROUTE)
+echo "Default interface: $DEFAULT_IFACE"
+
+LISTEN_CIDR=$(get_inet $DEFAULT_IFACE)
+LISTEN_IP=$(echo $LISTEN_CIDR | cut -d / -f 1)
+echo "Listen IP: $LISTEN_IP"
+
+# Remove the default route in the container, since docker routing is kinda fucked for things like this
+ip route del default
+
+ip route add table 100 $DEFAULT_ROUTE
+
+ip rule add pref 10 from $LISTEN_IP lookup 100
+
+ip rule add pref 10 from $INTERFACE_IP lookup 100
+
+ip route add default via $DEFAULT_GATEWAY_IP
+
+# Continue doing what the original container was doing
+exec "$@"
